@@ -3,7 +3,6 @@ import React, { useRef, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../store';
-import { physicsState } from './PhysicsState';
 import { GameState } from '../types';
 
 interface HoleProps {
@@ -23,9 +22,10 @@ export const Hole: React.FC<HoleProps> = ({ id, isPlayer = false, initialPos = [
   const radius = useRef(START_RADIUS);
   const score = useRef(0);
   
-  // Only subscribe to register function, not state
-  const registerHole = useGameStore(state => state.registerHole);
-  const updateHoleScore = useGameStore(state => state.updateHole); // Renamed usage conceptually
+  // Selectors to avoid re-rendering on every store update
+  const registerHole = useGameStore((s) => s.registerHole);
+  const updateHole = useGameStore((s) => s.updateHole);
+  const gameState = useGameStore((s) => s.gameState);
   
   const { camera, raycaster, pointer } = useThree();
   const visualRef = useRef<THREE.Group>(null);
@@ -41,13 +41,6 @@ export const Hole: React.FC<HoleProps> = ({ id, isPlayer = false, initialPos = [
       name,
       color
     });
-    
-    // Initialize physics state
-    physicsState.updateEntity(id, new THREE.Vector3(...initialPos), START_RADIUS, isPlayer);
-
-    return () => {
-      physicsState.removeEntity(id);
-    };
   }, [id, registerHole, initialPos, isPlayer, name, color]);
 
   // AI State
@@ -55,7 +48,7 @@ export const Hole: React.FC<HoleProps> = ({ id, isPlayer = false, initialPos = [
   const aiChangeTimer = useRef(0);
 
   useFrame((state, delta) => {
-    if (useGameStore.getState().gameState !== GameState.PLAYING) return;
+    if (gameState !== GameState.PLAYING) return;
 
     const currentPos = position.current;
     let targetVelocity = new THREE.Vector3(0, 0, 0);
@@ -84,21 +77,27 @@ export const Hole: React.FC<HoleProps> = ({ id, isPlayer = false, initialPos = [
          let nearestThreat = null;
          let minThreatDist = 10;
          
-         // Use Physics State for AI perception (Fast, no React overhead)
-         const allEntities = physicsState.getEntities();
+         // Transient read: Get holes directly from store state without subscribing
+         const holes = useGameStore.getState().holes;
+         const allHoles = Object.values(holes);
          
-         allEntities.forEach(ent => {
-            if (ent.id === id) return;
-            const dist = ent.position.distanceTo(currentPos);
-            if (dist < minThreatDist && ent.radius > radius.current) {
-                nearestThreat = ent;
+         allHoles.forEach(h => {
+            if (h.id === id) return;
+            // Calculate distance manually to avoid Vector3 allocation if possible, or just use simple math
+            const dx = h.position[0] - currentPos.x;
+            const dz = h.position[2] - currentPos.z;
+            const dist = Math.sqrt(dx*dx + dz*dz);
+            
+            if (dist < minThreatDist && h.radius > radius.current) {
+                nearestThreat = h;
                 minThreatDist = dist;
             }
          });
 
          if (nearestThreat) {
              // Flee
-             const threatPos = (nearestThreat as any).position;
+             const h = nearestThreat as any; // typed as HoleData
+             const threatPos = new THREE.Vector3(h.position[0], 0, h.position[2]);
              aiTarget.current = currentPos.clone().sub(threatPos).normalize().multiplyScalar(20).add(currentPos);
          } else {
              // Wander
@@ -135,8 +134,12 @@ export const Hole: React.FC<HoleProps> = ({ id, isPlayer = false, initialPos = [
       visualRef.current.scale.set(radius.current, 1, radius.current);
     }
     
-    // Sync to Physics State (Fast)
-    physicsState.updateEntity(id, currentPos, radius.current, isPlayer);
+    // Sync to Store (for UI and other entities)
+    // We update every frame so Prop/Ground can read it from store.getState()
+    updateHole(id, {
+        position: [currentPos.x, currentPos.y, currentPos.z],
+        radius: radius.current
+    });
 
     // Sync Camera (Player only)
     if (isPlayer) {
@@ -155,8 +158,8 @@ export const Hole: React.FC<HoleProps> = ({ id, isPlayer = false, initialPos = [
         score.current += val * 10;
         radius.current = Math.sqrt(Math.pow(radius.current, 2) + (size * size * 0.5));
         
-        // Update Store Score (Low Frequency - Only on event)
-        updateHoleScore(id, { 
+        // Update Score in Store
+        updateHole(id, { 
             score: score.current,
             radius: radius.current 
         });
@@ -164,7 +167,7 @@ export const Hole: React.FC<HoleProps> = ({ id, isPlayer = false, initialPos = [
     };
     window.addEventListener('hole-eat', onEat as any);
     return () => window.removeEventListener('hole-eat', onEat as any);
-  }, [id, updateHoleScore]);
+  }, [id, updateHole]);
 
   return (
     <group ref={visualRef}>

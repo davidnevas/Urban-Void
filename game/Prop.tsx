@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useBox, useCylinder } from '@react-three/cannon';
-import { physicsState } from './PhysicsState';
+import { useGameStore } from '../store';
 import { PropConfig, PropType } from '../types';
 
 export const Prop: React.FC<PropConfig> = ({ id, type, position, size, value, color }) => {
@@ -20,12 +20,13 @@ export const Prop: React.FC<PropConfig> = ({ id, type, position, size, value, co
     
     const pos = ref.current.position;
     
-    // FAST READ: Get holes from mutable physics state
-    const entities = physicsState.getEntities();
+    // Transient read: Get holes directly from store state
+    const holes = useGameStore.getState().holes;
+    const holeList = Object.values(holes);
 
-    for (const hole of entities) {
-      const dx = pos.x - hole.position.x;
-      const dz = pos.z - hole.position.z;
+    for (const hole of holeList) {
+      const dx = pos.x - hole.position[0];
+      const dz = pos.z - hole.position[2];
       const dist = Math.sqrt(dx*dx + dz*dz); 
 
       // Collision Logic

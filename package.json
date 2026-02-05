@@ -8,19 +8,19 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
-    "three": "latest",
-    "@react-three/fiber": "^9.0.0-rc.1",
-    "@react-three/drei": "latest",
-    "@react-three/cannon": "latest",
-    "zustand": "^4.5.2",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "three": "0.160.0",
+    "@react-three/fiber": "8.15.16",
+    "@react-three/drei": "9.99.0",
+    "@react-three/cannon": "6.6.0",
+    "zustand": "4.5.0",
     "leva": "^0.9.35"
   },
   "devDependencies": {
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
-    "@types/three": "latest",
+    "@types/react": "18.2.0",
+    "@types/react-dom": "18.2.0",
+    "@types/three": "0.160.0",
     "vite": "latest",
     "typescript": "latest"
   }
