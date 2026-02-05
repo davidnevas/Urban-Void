@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useGameStore } from '../store';
 import { GameState } from '../types';
 
@@ -72,14 +72,14 @@ const GameOver: React.FC = () => {
 
 const HUD: React.FC = () => {
   const timeLeft = useGameStore(state => state.timeLeft);
+  const holes = useGameStore(state => state.holes);
   
-  // Custom selector to derive leaderboard data
-  const leaderboard = useGameStore(state => {
-     const holes = Object.values(state.holes);
-     return holes
+  // Memoize leaderboard derivation to avoid unstable selector returns
+  const leaderboard = useMemo(() => {
+     return Object.values(holes)
        .sort((a, b) => b.score - a.score)
        .map(h => ({ id: h.id, name: h.name, score: Math.floor(h.score), color: h.color }));
-  });
+  }, [holes]);
   
   const mins = Math.floor(timeLeft / 60);
   const secs = timeLeft % 60;

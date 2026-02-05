@@ -2,7 +2,7 @@
 import React, { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { useGameStore } from '../store';
+import { physicsState } from './PhysicsState';
 import { createGroundMaterial } from './materials';
 
 export const Ground: React.FC = () => {
@@ -50,17 +50,16 @@ export const Ground: React.FC = () => {
     
     const mat = meshRef.current.material as THREE.MeshStandardMaterial;
     if (mat.userData.shader) {
-      // Transient read: Get holes directly from store state
-      const holes = useGameStore.getState().holes;
-      const activeHoles = Object.values(holes).slice(0, 4);
+      // Transient read: Get holes directly from PhysicsState
+      const activeHoles = physicsState.getEntities().slice(0, 4);
       
       mat.userData.shader.uniforms.uHoleCount.value = activeHoles.length;
       
       activeHoles.forEach((hole, index) => {
         mat.userData.shader.uniforms.uHoles.value[index].set(
-          hole.position[0],
+          hole.position.x,
           hole.radius,
-          hole.position[2]
+          hole.position.z
         );
       });
     }

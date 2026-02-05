@@ -22,10 +22,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
   
   setGameState: (state) => set({ gameState: state }),
   
+  // Used for initial registration (Names, Colors)
   registerHole: (data) => set((state) => ({
     holes: { ...state.holes, [data.id]: data }
   })),
   
+  // Used for Scoreboard updates (Low Frequency)
   updateHole: (id, data) => set((state) => {
     const current = state.holes[id];
     if (!current) return state;

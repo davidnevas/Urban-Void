@@ -3,6 +3,7 @@ import React, { useRef, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../store';
+import { physicsState, PhysicsEntity } from './PhysicsState';
 import { GameState } from '../types';
 
 interface HoleProps {
@@ -30,8 +31,9 @@ export const Hole: React.FC<HoleProps> = ({ id, isPlayer = false, initialPos = [
   const { camera, raycaster, pointer } = useThree();
   const visualRef = useRef<THREE.Group>(null);
 
-  // Initial Registration
+  // Initial Registration & Physics Cleanup
   useEffect(() => {
+    // Register in UI Store (Static Info)
     registerHole({
       id,
       position: initialPos,
@@ -41,6 +43,13 @@ export const Hole: React.FC<HoleProps> = ({ id, isPlayer = false, initialPos = [
       name,
       color
     });
+    
+    // Initialize Physics State
+    physicsState.updateEntity(id, new THREE.Vector3(...initialPos), START_RADIUS, isPlayer);
+
+    return () => {
+      physicsState.removeEntity(id);
+    };
   }, [id, registerHole, initialPos, isPlayer, name, color]);
 
   // AI State
@@ -74,19 +83,15 @@ export const Hole: React.FC<HoleProps> = ({ id, isPlayer = false, initialPos = [
       if (aiChangeTimer.current <= 0) {
          aiChangeTimer.current = Math.random() * 2 + 1;
          
-         let nearestThreat = null;
+         let nearestThreat: PhysicsEntity | null = null;
          let minThreatDist = 10;
          
-         // Transient read: Get holes directly from store state without subscribing
-         const holes = useGameStore.getState().holes;
-         const allHoles = Object.values(holes);
+         // Fast Read from PhysicsState
+         const allHoles = physicsState.getEntities();
          
          allHoles.forEach(h => {
             if (h.id === id) return;
-            // Calculate distance manually to avoid Vector3 allocation if possible, or just use simple math
-            const dx = h.position[0] - currentPos.x;
-            const dz = h.position[2] - currentPos.z;
-            const dist = Math.sqrt(dx*dx + dz*dz);
+            const dist = h.position.distanceTo(currentPos);
             
             if (dist < minThreatDist && h.radius > radius.current) {
                 nearestThreat = h;
@@ -96,8 +101,7 @@ export const Hole: React.FC<HoleProps> = ({ id, isPlayer = false, initialPos = [
 
          if (nearestThreat) {
              // Flee
-             const h = nearestThreat as any; // typed as HoleData
-             const threatPos = new THREE.Vector3(h.position[0], 0, h.position[2]);
+             const threatPos = (nearestThreat as PhysicsEntity).position;
              aiTarget.current = currentPos.clone().sub(threatPos).normalize().multiplyScalar(20).add(currentPos);
          } else {
              // Wander
@@ -134,12 +138,9 @@ export const Hole: React.FC<HoleProps> = ({ id, isPlayer = false, initialPos = [
       visualRef.current.scale.set(radius.current, 1, radius.current);
     }
     
-    // Sync to Store (for UI and other entities)
-    // We update every frame so Prop/Ground can read it from store.getState()
-    updateHole(id, {
-        position: [currentPos.x, currentPos.y, currentPos.z],
-        radius: radius.current
-    });
+    // SYNC TO PHYSICS STATE (High Freq)
+    // This allows Props and Ground to see us without React updates
+    physicsState.updateEntity(id, currentPos, radius.current, isPlayer);
 
     // Sync Camera (Player only)
     if (isPlayer) {
@@ -158,7 +159,7 @@ export const Hole: React.FC<HoleProps> = ({ id, isPlayer = false, initialPos = [
         score.current += val * 10;
         radius.current = Math.sqrt(Math.pow(radius.current, 2) + (size * size * 0.5));
         
-        // Update Score in Store
+        // Update Score in UI Store (Low Freq)
         updateHole(id, { 
             score: score.current,
             radius: radius.current 
