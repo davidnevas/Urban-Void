@@ -1,7 +1,6 @@
 {
   "name": "urban-void",
-  "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,18 +10,18 @@
   "dependencies": {
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "three": "0.160.0",
-    "@react-three/fiber": "8.15.16",
-    "@react-three/drei": "9.99.0",
-    "@react-three/cannon": "6.6.0",
-    "zustand": "4.5.2",
-    "leva": "0.9.35",
-    "dom": "^0.0.3"
+    "three": "latest",
+    "@react-three/fiber": "^9.0.0-rc.1",
+    "@react-three/drei": "latest",
+    "@react-three/cannon": "latest",
+    "zustand": "^4.5.2",
+    "leva": "^0.9.35"
   },
   "devDependencies": {
-    "@types/node": "^22.14.0",
-    "@vitejs/plugin-react": "^5.0.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@types/three": "latest",
+    "vite": "latest",
+    "typescript": "latest"
   }
 }

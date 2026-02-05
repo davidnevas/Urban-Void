@@ -7,7 +7,9 @@ import { Scene } from './game/Scene';
 import { UI } from './components/UI';
 
 const App: React.FC = () => {
-  const { gameState, decrementTime } = useGameStore();
+  // Use selector to avoid re-rendering on hole updates
+  const gameState = useGameStore(state => state.gameState);
+  const decrementTime = useGameStore(state => state.decrementTime);
 
   useEffect(() => {
     let timer: ReturnType<typeof setInterval>;

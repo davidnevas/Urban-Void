@@ -1,78 +1,57 @@
 /// <reference lib="dom" />
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useBox, useCylinder } from '@react-three/cannon';
-import { useGameStore } from '../store';
-import { PropConfig, PropType, HoleData } from '../types';
-import * as THREE from 'three';
-
-// Temporary vector for math
-const vec = new THREE.Vector3();
+import { physicsState } from './PhysicsState';
+import { PropConfig, PropType } from '../types';
 
 export const Prop: React.FC<PropConfig> = ({ id, type, position, size, value, color }) => {
   const [consumed, setConsumed] = useState(false);
   
-  // Physics Body
-  // We use different shapes based on type
   const isCylinder = type === PropType.TREE || type === PropType.BARREL || type === PropType.LAMP;
   
   const [ref, api] = isCylinder 
     ? useCylinder(() => ({ mass: 1, position, args: [size, size, size * 2, 8] })) 
     : useBox(() => ({ mass: 1, position, args: [size * 2, size * 2, size * 2] }));
 
-  const holes = useGameStore(state => state.holes);
-
   useFrame(() => {
-    if (consumed) return; // Already falling or gone
-
-    // Get current position from physics API
-    // Note: accessing api.position.subscribe is slow if done every frame for 100s of objects.
-    // Recommended: Use the ref.current which matches the mesh, but cannon updates it.
+    if (consumed) return;
     if (!ref.current) return;
     
     const pos = ref.current.position;
     
-    // Check against all holes
-    const holeList = Object.values(holes) as HoleData[];
-    for (const hole of holeList) {
-      const dx = pos.x - hole.position[0];
-      const dz = pos.z - hole.position[2];
-      const dist = Math.sqrt(dx*dx + dz*dz); // Simple 2D distance
+    // FAST READ: Get holes from mutable physics state
+    const entities = physicsState.getEntities();
 
-      // Consumption condition
-      // 1. Center is within hole radius (or close enough)
-      // 2. Hole is strictly larger than the object
+    for (const hole of entities) {
+      const dx = pos.x - hole.position.x;
+      const dz = pos.z - hole.position.z;
+      const dist = Math.sqrt(dx*dx + dz*dz); 
+
+      // Collision Logic
       if (dist < hole.radius - (size * 0.5) && hole.radius > size * 1.2) {
-        
         setConsumed(true);
-        
-        // 1. Disable collisions so it falls through the floor
+        // Disable physics
         api.collisionFilterGroup.set(0);
         api.collisionFilterMask.set(0);
-        
-        // 2. Apply downward velocity
+        // Fall animation
         api.velocity.set(0, -10, 0);
         
-        // 3. Emit event for score/growth
+        // Dispatch Event
         const event = new CustomEvent('hole-eat', { 
             detail: { holeId: hole.id, value, size } 
         });
         window.dispatchEvent(event);
         
-        // 4. Cleanup after animation
+        // Hide later
         setTimeout(() => {
-           // In a real optimized game, we'd recycle this object pool.
-           // Here we just unmount via parent logic or hide.
-           // Since we can't easily unmount from inside, we'll just stop rendering logic.
            if (ref.current) ref.current.visible = false;
         }, 1000);
-        
-        break; // Consumed by one hole only
+        break; 
       } else if (dist < hole.radius + size && hole.radius > size) {
-        // Pull force (Gravity well effect) if near edge
+        // Push away from edge if not fully inside
         const force = 10;
         const angle = Math.atan2(dz, dx);
-        // Pull towards center
         api.applyForce([-Math.cos(angle) * force, 0, -Math.sin(angle) * force], [0,0,0]);
       }
     }
@@ -80,8 +59,6 @@ export const Prop: React.FC<PropConfig> = ({ id, type, position, size, value, co
 
   if (!consumed && ref.current && ref.current.visible === false) return null;
 
-  // Render Logic
-  // Simple geometries for prototype "Realistic" assets
   return (
     <group ref={ref as any}>
        {type === PropType.TREE ? (
@@ -99,7 +76,6 @@ export const Prop: React.FC<PropConfig> = ({ id, type, position, size, value, co
           <mesh castShadow receiveShadow>
              <boxGeometry args={[size * 2, size * 4, size * 2]} />
              <meshStandardMaterial color={color} roughness={0.2} metalness={0.5} />
-             {/* Windows simulation via texture would go here */}
           </mesh>
        ) : type === PropType.CAR ? (
           <group>

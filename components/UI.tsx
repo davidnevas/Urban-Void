@@ -3,7 +3,8 @@ import { useGameStore } from '../store';
 import { GameState } from '../types';
 
 const Menu: React.FC = () => {
-  const { setGameState, resetGame } = useGameStore();
+  const setGameState = useGameStore(state => state.setGameState);
+  const resetGame = useGameStore(state => state.resetGame);
   
   const startGame = () => {
     resetGame();
@@ -31,9 +32,11 @@ const Menu: React.FC = () => {
 };
 
 const GameOver: React.FC = () => {
-  const { getLeaderboard, setGameState } = useGameStore();
+  // Select leaderboard only once at end
+  const getLeaderboard = useGameStore(state => state.getLeaderboard);
+  const setGameState = useGameStore(state => state.setGameState);
   const leaderboard = getLeaderboard();
-  const winner = leaderboard[0];
+  const winner = leaderboard[0] || { id: 'none', name: 'None', color: '#fff', score: 0 };
   const isPlayerWinner = winner.id === 'player-1';
 
   return (
@@ -68,24 +71,28 @@ const GameOver: React.FC = () => {
 };
 
 const HUD: React.FC = () => {
-  const { timeLeft, getLeaderboard } = useGameStore();
-  const leaderboard = getLeaderboard();
+  const timeLeft = useGameStore(state => state.timeLeft);
   
-  // Format time
+  // Custom selector to derive leaderboard data
+  const leaderboard = useGameStore(state => {
+     const holes = Object.values(state.holes);
+     return holes
+       .sort((a, b) => b.score - a.score)
+       .map(h => ({ id: h.id, name: h.name, score: Math.floor(h.score), color: h.color }));
+  });
+  
   const mins = Math.floor(timeLeft / 60);
   const secs = timeLeft % 60;
   const timeString = `${mins}:${secs.toString().padStart(2, '0')}`;
 
   return (
     <div className="absolute inset-0 pointer-events-none z-10 p-4">
-      {/* Top Center Timer */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 flex flex-col items-center">
         <div className="text-4xl font-black text-white drop-shadow-md font-mono">
           {timeString}
         </div>
       </div>
 
-      {/* Top Right Leaderboard */}
       <div className="absolute top-4 right-4 bg-black/50 p-4 rounded-lg backdrop-blur-sm min-w-[200px]">
         <h3 className="text-white font-bold text-xs uppercase tracking-wider mb-2 opacity-70">Leaderboard</h3>
         <div className="flex flex-col gap-1">
@@ -102,8 +109,6 @@ const HUD: React.FC = () => {
           ))}
         </div>
       </div>
-      
-      {/* Mobile Joysticks or Tips could go here */}
     </div>
   );
 };
